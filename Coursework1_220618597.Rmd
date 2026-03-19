@@ -1,0 +1,137 @@
+---
+title: "MTH6139 Time Series" 
+subtitle: "Mauna Loa Atmospheric CO2 Concentration Time Series Analysis" 
+author: "Kyha Haynes-Muir" 
+date: "19.03.2026" 
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: spacelab 
+    highlight: tango
+---
+ 
+```{r, echo=FALSE}
+# This code will display the QMUL logo at the top right of the page
+# Do not change this code
+htmltools::img(src = knitr::image_uri("images/QMlogo.png"),
+               alt = 'logo',
+               style = 'position:absolute; top:0; right:0; padding:10px; width:20%;')
+```
+
+# 1: Introduction
+We will be conducting a time series analysis on the co2 time series within the R dataset package. Through this analysis, our goal is to develop an understanding of the data, specifically its trend and seasonality, and make future predictions using Meta's Prophet forecasting system.
+
+
+# 2: Understanding the data
+
+## 2.1 General overview
+The co2 dataset is a a time series storing data on the atmospheric carbon dioxide (CO2) concentration from the Mauna Loa observatory, located in Hawaii. The atmospheric CO2 concentration at this site is generally used as an estimate of global CO2 levels, and is therefore used to predict potential changes in climate change and global warming.
+
+![](images/mauna-loa-observatory.jpg)
+
+In the co2 time series, the atmospheric concentrations of CO2 are expressed in parts per million (ppm) and reported in the preliminary 1997 SIO manometric mole fraction scale.
+
+## 2.2 Visualising the data
+Before we proceed with analysis, it is essential to visualise the data to further consolidate our understanding, specifically the story that the data is trying to tell us. First, we must load the data in R and assign it to an appropriate variable (in this case `co2`). We can then use the `head()` and `tail()` functions to observe the form of the data.
+
+```{r}
+# Load the dataset and store in a variable co2
+co2<-datasets::co2
+# Use head and tail functions to observe the data
+head(co2)
+tail(co2)
+```
+We can see that the time series begins in January 1959 and ends in December 1997. It appears that it is reported in months - this can also be checked using the `frequency()` function, which outputs the number of data points per year.
+```{r}
+frequency(co2)
+```
+Next we plot the time series data.
+```{r}
+plot(co2, 
+     ylab = "Atmospheric CO2 concentration (ppm)", 
+     main = "Mauna Loa atmospheric CO2 concentration")
+```
+
+We can see from this plot that the time series has a positive trend with clear seasonality. This can be shown more explicitly using the Brockwell and Davies algorithm, which can be implemented in R using the `decompose()` function.
+
+```{r}
+plot(decompose(co2))
+```
+
+## 2.3 Trend
+As previously stated, there is a clear positive trend that looks to be linear, therefore we will proceed with a linear regression model.
+```{r}
+# Create a linear regression model
+co2.lm<-lm(co2~time(co2), na.action = NULL)
+# Produce model summary statistics
+summary(co2.lm)
+```
+Looking at the model coefficients, the model estimates that the atmospheric CO2 concentration increases by 1.308ppm per year. Note that this is only an estimate as it does not take into account the seasonality, only the trend. This is made clear when we re-plot the time series with the model regression line.
+
+
+```{r}
+# Re-plot the time series with the model regression line
+plot(co2)
+abline(co2.lm, col="red")
+```
+
+
+## 2.4 Seasonality
+Observing the plots above, it is evident that there is yearly or close to yearly seasonality. Observing the raw data indicates that the highest values of atmospheric CO2 concentration were recorded around the middle of the year (May and June) and the lowest values around October. This pattern repeats itself consistently in each year.
+
+
+# 3: Prophet Forecasting
+
+## 3.1 Preparing to forecast
+Before we continue, we must ensure that the correct packages are installed and the correct libraries loaded. We first want the load the library 'prophet'; if this is your first time loading the library you will likely need to install the appropriate package first using `install.packages("prophet")`.
+```{r}
+# Loading the prophet library
+library(prophet)
+```
+
+## 3.2 Formatting the data
+For forecasting using prophet we want to ensure that the data is in the correct format, specifically a data frame with the times in a column labelled **ds** and the CO2 values in a column labelled **y**. We can do this using the function `data.frame()`. To extract the times from a time series object, we must use the function `time()`. We will also use the function `yearmon()` to write these times in the correct format, for which we will need to load the library **zoo**.
+```{r}
+# Load zoo library
+library(zoo)
+```
+
+```{r}
+# Load the data frame and assign it to a variable
+co2.df<-data.frame(ds = yearmon(time(co2)), y = co2)
+# Use the head() function to check the data frame
+head(co2.df)
+```
+ 
+
+## 3.3 Making predictions
+We can now proceed with making and plotting predictions using prophet. We want to make eight new predictions, in this case predictions for the next eight months. To do this we must specify this value in the function `make_future_dataframe()` as well as specifying the frequency ('freq') to be 'month'.
+```{r}
+# Create the prophet model
+prophet.model<-prophet(co2.df)
+# Create a data frame with future dates
+future.df<-make_future_dataframe(prophet.model, 8, freq = "month")
+# Create predictions using prophet model and data frame
+forecast<-predict(prophet.model, future.df)
+```
+
+
+```{r}
+# Plot the data with the future predictions
+plot(prophet.model, forecast, xlab = "Time", 
+     ylab = "Atmospheric CO2 concentration (ppm)")
+```
+The plot above shows the time series from the original observed data (the blue line with black dots), as well as the eight future predictions made by the prophet forecasting system (the blue line). The prophet system does an adequate job of predicting these future values, taking into account both the trend and seasonality in this time series. As in previous years, we can see that the atmospheric CO2 concentration will peak around the middle of the year in 1998 and will be marginally greater than the peak of the previous year (1997). After this, the seasonal pattern of the data results in a steady decrease leading to the end of the year.
+
+
+# References
+
+- Atmospheric carbon dioxide & Mauna Loa: <https://www.climate.gov/news-features/understanding-climate/climate-change-atmospheric-carbon-dioxide>
+- Guide to using prophet: <https://cloud.r-project.org/web/packages/prophet/vignettes/quick_start.html>
+- Using prophet for forecasting: <https://mode.com/example-gallery/forecasting_prophet_r_cookbook#forecasting>
+
+
+- Datacamp course: <https://www.datacamp.com/courses/reporting-with-rmarkdown>
+- RStudio reference: <https://rmarkdown.rstudio.com/lesson-1.html>
+- More sophisticated reference: <https://bookdown.org/yihui/rmarkdown/>
